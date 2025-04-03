@@ -1,4 +1,6 @@
 import { HealthData, HealthStatus } from './HealthAnalysisService';
+import { securityService } from './SecurityService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type MonitoringSchedule = 'hourly' | 'daily' | 'weekly' | 'monthly';
 
@@ -30,6 +32,9 @@ export type HealthAlert = {
 };
 
 class HealthMonitoringService {
+  createAlert(arg0: { id: string; message: string; status: HealthStatus; timestamp: Date; metrics: { [x: string]: { value: number; status: HealthStatus; }; }; }) {
+    throw new Error('Method not implemented.');
+  }
   private monitoringConfig: HealthMonitoringConfig;
   private healthHistory: {
     data: HealthData;
@@ -37,6 +42,7 @@ class HealthMonitoringService {
     status: HealthStatus;
   }[] = [];
   private alerts: HealthAlert[] = [];
+  private userId: string | null = null;
 
   constructor() {
     // Default configuration
@@ -58,9 +64,33 @@ class HealthMonitoringService {
   }
 
   /**
+   * Set the user ID for the current session
+   */
+  public setUserId(userId: string): void {
+    this.userId = userId;
+    // Reload data for the specific user
+    this.loadFromStorage();
+  }
+
+  /**
+   * Clear user data when logging out
+   */
+  public clearUserData(): void {
+    this.userId = null;
+    this.healthHistory = [];
+    this.alerts = [];
+  }
+
+  /**
    * Save current health data to the history
    */
   public saveHealthData(data: HealthData, status: HealthStatus): void {
+    // Verify user is authenticated before saving health data
+    if (!this.userId || !securityService.isAuthenticated()) {
+      securityService.logSecurityEvent('Unauthorized health data save attempt', 'warning');
+      throw new Error('Authentication required to save health data');
+    }
+
     this.healthHistory.push({
       data,
       timestamp: new Date(),
@@ -82,6 +112,12 @@ class HealthMonitoringService {
     timestamp: Date;
     status: HealthStatus;
   }[] {
+    // Verify user is authenticated before retrieving health data
+    if (!this.userId || !securityService.isAuthenticated()) {
+      securityService.logSecurityEvent('Unauthorized health history access attempt', 'warning');
+      return []; // Return empty array instead of throwing error for better UX
+    }
+
     return [...this.healthHistory];
   }
 
@@ -89,6 +125,12 @@ class HealthMonitoringService {
    * Get all alerts
    */
   public getAlerts(): HealthAlert[] {
+    // Verify user is authenticated before retrieving alerts
+    if (!this.userId || !securityService.isAuthenticated()) {
+      securityService.logSecurityEvent('Unauthorized alerts access attempt', 'warning');
+      return []; // Return empty array instead of throwing error for better UX
+    }
+
     return [...this.alerts];
   }
 
@@ -238,45 +280,85 @@ class HealthMonitoringService {
   }
 
   /**
-   * Save data to persistent storage
+   * Save current state to persistent storage
    */
-  private saveToStorage(): void {
+  private async saveToStorage(): Promise<void> {
+    if (!this.userId) {
+      return;
+    }
+
     try {
-      // In a real app, you would use AsyncStorage or another storage solution
-      // AsyncStorage.setItem('healthMonitoring', JSON.stringify({
-      //   config: this.monitoringConfig,
-      //   history: this.healthHistory,
-      //   alerts: this.alerts,
-      // }));
-      
-      // For now, just log that we're saving
-      console.log('Saving health monitoring data to storage');
+      // Encrypt sensitive health data before storage
+      const storageKey = `health_monitoring_data_${this.userId}`;
+      const dataToSave = {
+        config: this.monitoringConfig,
+        history: this.healthHistory,
+        alerts: this.alerts,
+      };
+
+      // Stringify and encrypt using the security service
+      const jsonData = JSON.stringify(dataToSave);
+      const encryptedData = securityService.encryptHealthData({
+        type: 'storage',
+        data: jsonData
+      } as unknown as HealthData); 
+
+      await AsyncStorage.setItem(storageKey, encryptedData);
     } catch (error) {
       console.error('Error saving health monitoring data:', error);
     }
   }
 
   /**
-   * Load data from persistent storage
+   * Load saved state from persistent storage
    */
-  private loadFromStorage(): void {
+  private async loadFromStorage(): Promise<void> {
+    if (!this.userId) {
+      return;
+    }
+
     try {
-      // In a real app, you would use AsyncStorage or another storage solution
-      // const savedData = AsyncStorage.getItem('healthMonitoring');
-      // if (savedData) {
-      //   const parsed = JSON.parse(savedData);
-      //   this.monitoringConfig = parsed.config;
-      //   this.healthHistory = parsed.history;
-      //   this.alerts = parsed.alerts;
-      // }
-      
-      // For now, just log that we're loading
-      console.log('Loading health monitoring data from storage');
+      const storageKey = `health_monitoring_data_${this.userId}`;
+      const savedData = await AsyncStorage.getItem(storageKey);
+
+      if (savedData) {
+        try {
+          // Decrypt the data using the security service
+          const decryptedData = securityService.decryptHealthData(savedData);
+          const parsedData = JSON.parse((decryptedData as unknown as {data: string}).data);
+
+          // Restore saved state
+          if (parsedData.config) {
+            this.monitoringConfig = parsedData.config;
+          }
+
+          if (parsedData.history) {
+            // Convert ISO date strings back to Date objects
+            this.healthHistory = parsedData.history.map((item: any) => ({
+              ...item,
+              timestamp: new Date(item.timestamp)
+            }));
+          }
+
+          if (parsedData.alerts) {
+            // Convert ISO date strings back to Date objects
+            this.alerts = parsedData.alerts.map((alert: any) => ({
+              ...alert,
+              timestamp: new Date(alert.timestamp)
+            }));
+          }
+        } catch (decryptError) {
+          console.error('Error decrypting health data:', decryptError);
+          securityService.logSecurityEvent('Data decryption error', 'critical', {
+            error: String(decryptError)
+          });
+        }
+      }
     } catch (error) {
       console.error('Error loading health monitoring data:', error);
     }
   }
 }
 
-// Export a singleton instance
+// Export a singleton instance of the health monitoring service
 export const healthMonitoringService = new HealthMonitoringService(); 

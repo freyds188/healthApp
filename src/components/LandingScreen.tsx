@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -12,15 +12,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { securityService } from '../services/SecurityService';
+import { healthMonitoringService } from '../services/HealthMonitoringService';
+import { NavigationProp, CommonActions } from '@react-navigation/native';
+import { RootStackParamList } from '../../App'; // Import from App.tsx
 
-type RootStackParamList = {
-    Landing: undefined;
-    Home: undefined;
-    Appointment: undefined;
-    Messages: undefined;
-    Login: undefined;
-};
-
+// Use the imported RootStackParamList
 type LandingScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Landing'>;
 
 type Props = {
@@ -73,10 +70,15 @@ const doctors = [
     }
 ];
 
+// Add AsyncStorage import
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
 const LandingScreen: React.FC<Props> = ({ navigation }) => {
     const [showMenu, setShowMenu] = useState(false);
     const [activeTab, setActiveTab] = useState('home');
     const slideAnim = useState(new Animated.Value(-280))[0];
+    const [userName, setUserName] = useState('User');
 
     const currentDate = new Date();
     const formattedDate = currentDate.toLocaleDateString('en-US', {
@@ -85,6 +87,14 @@ const LandingScreen: React.FC<Props> = ({ navigation }) => {
         month: 'short',
         year: 'numeric',
     }).toUpperCase();
+
+    // Load user info when the screen loads
+    useEffect(() => {
+        const user = securityService.getCurrentUser();
+        if (user) {
+            setUserName(user.name.split(' ')[0]); // Use first name only
+        }
+    }, []);
 
     // Get current month dates
     const getDates = () => {
@@ -114,11 +124,63 @@ const LandingScreen: React.FC<Props> = ({ navigation }) => {
         setActiveTab(tabName);
         if (tabName === 'appointment') {
             navigation.navigate('Appointment');
+        } else if (tabName === 'home') {
+            navigation.navigate('Home');
+        } else if (tabName === 'messages') {
+            navigation.navigate('Messages');
         }
     };
 
-    const handleLogout = () => {
-        navigation.navigate('Login');
+    // Update the logout function to use AsyncStorage
+    const handleLogout = async () => {
+        Alert.alert(
+            'Confirm Logout',
+            'Are you sure you want to log out?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Logout',
+                    onPress: async () => {
+                        try {
+                            // Clear AsyncStorage
+                            await AsyncStorage.removeItem('current_user');
+                            
+                            // Clear user data from health monitoring service
+                            healthMonitoringService.clearUserData();
+                            
+                            // Log the user out from security service
+                            await securityService.logout();
+                            
+                            // Navigate to login screen
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Login' }],
+                                })
+                            );
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                            Alert.alert('Error', 'An error occurred during logout');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleTermsAndConditions = () => {
+        navigation.navigate('TermsAndConditions', {
+            terms: [
+                'Use the app only for its intended medical purposes',
+                'Keep your login credentials secure',
+                'Not share sensitive medical information through unsecured channels',
+                'Comply with all applicable laws and regulations',
+                'Accept our data privacy and protection policies'
+            ]
+        });
     };
 
     return (
@@ -146,13 +208,13 @@ const LandingScreen: React.FC<Props> = ({ navigation }) => {
                         <TouchableOpacity style={styles.profileIcon}>
                             <Ionicons name="person-circle-outline" size={40} color="#4A4A4A" />
                         </TouchableOpacity>
-                        <Text style={styles.greeting}>Good day, User!</Text>
+                        <Text style={styles.greeting}>Good day, {userName}!</Text>
                     </View>
                 </View>
 
                 {/* AI Health Assessment */}
                 <TouchableOpacity style={styles.assessmentCard}>
-                    <Text style={styles.assessmentText}>AI Health Assessment</Text>
+                    <Text style={styles.assessmentText}>Your AI Health Assessment</Text>
                 </TouchableOpacity>
 
                 {/* Track Your Health */}
@@ -285,50 +347,68 @@ const LandingScreen: React.FC<Props> = ({ navigation }) => {
 
             <Animated.View
                 style={[
-                    styles.sideMenu,
+                    styles.menu,
                     {
                         transform: [{ translateX: slideAnim }],
                     },
                 ]}
             >
-                <View style={styles.drawerHeader}>
-                    <View style={styles.logoContainer}>
-                        <View style={styles.appIconCircle}>
-                            <Ionicons name="heart" size={24} color="#fff" />
+                <View style={styles.menuHeader}>
+                    <TouchableOpacity style={styles.menuProfile}>
+                        <Ionicons name="person-circle" size={60} color="#4CAF50" />
+                        <View style={styles.menuProfileInfo}>
+                            <Text style={styles.menuProfileName}>{userName}</Text>
+                            <Text style={styles.menuProfileEmail}>
+                                {securityService.getCurrentUser()?.email || 'user@example.com'}
+                            </Text>
                         </View>
-                        <Text style={styles.drawerTitle}>Health Care App</Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
-
+                
                 <ScrollView style={styles.menuItems}>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="person-outline" size={22} color="#4A4A4A" />
-                        <Text style={styles.menuItemText}>Profile</Text>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Landing')}>
+                        <Ionicons name="home-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Home</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="shield-checkmark-outline" size={22} color="#4A4A4A" />
-                        <Text style={styles.menuItemText}>Privacy</Text>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Appointment')}>
+                        <Ionicons name="calendar-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Appointments</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="settings-outline" size={22} color="#4A4A4A" />
-                        <Text style={styles.menuItemText}>System Setting</Text>
+                   
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Messages')}>
+                        <Ionicons name="chatbubbles-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Messages</Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="document-text-outline" size={22} color="#4A4A4A" />
+                        <Ionicons name="settings-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Settings</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Ionicons name="shield-checkmark-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Privacy & Security</Text>
+                    </TouchableOpacity>
+                    
+                    {/* Added Terms & Conditions menu item */}
+                    <TouchableOpacity 
+                        style={styles.menuItem} 
+                        onPress={handleTermsAndConditions}
+                    >
+                        <Ionicons name="document-text-outline" size={24} color="#4A4A4A" />
                         <Text style={styles.menuItemText}>Terms & Conditions</Text>
                     </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.menuItem}>
+                        <Ionicons name="help-circle-outline" size={24} color="#4A4A4A" />
+                        <Text style={styles.menuItemText}>Help & Support</Text>
+                    </TouchableOpacity>
+                    
+                    <View style={styles.menuDivider} />
+                    
+                    <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                        <Ionicons name="log-out-outline" size={24} color="#FF4B4B" />
+                        <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
+                    </TouchableOpacity>
                 </ScrollView>
-
-                <TouchableOpacity
-                    style={[styles.menuItem, styles.logoutItem]}
-                    onPress={handleLogout}
-                >
-                    <Ionicons name="log-out-outline" size={22} color="#fff" style={styles.logoutIcon} />
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
             </Animated.View>
         </View>
     );
@@ -529,21 +609,20 @@ const styles = StyleSheet.create({
     overlay: {
         position: 'absolute',
         top: 0,
-        left: 0,
         right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 2,
+        width: Dimensions.get('window').width,
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 998,
     },
-    sideMenu: {
+    menu: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        bottom: 0,
         width: 280,
+        height: '100%',
         backgroundColor: '#fff',
-        zIndex: 3,
-        elevation: 8,
+        zIndex: 999,
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 20,
         shadowColor: '#000',
         shadowOffset: {
             width: 2,
@@ -551,78 +630,51 @@ const styles = StyleSheet.create({
         },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
+        elevation: 5,
     },
-    drawerHeader: {
-        paddingTop: 60,
-        paddingBottom: 30,
-        paddingHorizontal: 20,
+    menuHeader: {
+        padding: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        backgroundColor: '#fff',
+        borderBottomColor: '#E0E0E0',
     },
-    logoContainer: {
+    menuProfile: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
     },
-    appIconCircle: {
-        width: 45,
-        height: 45,
-        borderRadius: 23,
-        backgroundColor: '#4CAF50',
-        marginRight: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
+    menuProfileInfo: {
+        marginLeft: 15,
     },
-    drawerTitle: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#000',
-        letterSpacing: 0.5,
+    menuProfileName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#4A4A4A',
+    },
+    menuProfileEmail: {
+        fontSize: 14,
+        color: '#9E9E9E',
     },
     menuItems: {
         flex: 1,
-        paddingTop: 30,
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 25,
-        marginBottom: 8,
+        padding: 15,
+        paddingLeft: 20,
     },
     menuItemText: {
         fontSize: 16,
         color: '#4A4A4A',
-        fontWeight: '500',
         marginLeft: 15,
     },
-    logoutItem: {
-        backgroundColor: '#4CAF50',
+    menuDivider: {
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        marginVertical: 10,
         marginHorizontal: 20,
-        marginBottom: 30,
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-    },
-    logoutIcon: {
-        marginRight: 8,
     },
     logoutText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-        textAlign: 'center',
+        color: '#FF4B4B',
     },
     bottomNav: {
         flexDirection: 'row',
@@ -663,4 +715,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default LandingScreen; 
+export default LandingScreen;

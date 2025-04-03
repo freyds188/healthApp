@@ -8,21 +8,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
-
-type RootStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  Landing: undefined;
-};
+import { securityService } from '../services/SecurityService'; // Import the instance instead of class
+import { RootStackParamList } from '../../App'; // Import from App.tsx
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RegisterScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Register'>;
 
 type Props = {
   navigation: RegisterScreenNavigationProp;
 };
+
+// Using the imported securityService instance instead of creating a new one
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [fullName, setFullName] = useState('');
@@ -31,10 +32,78 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = () => {
-    // Implement registration logic here
-    navigation.navigate('Landing');
+  const handleRegister = async () => {
+    if (!fullName || !email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    // Enhanced password validation
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters long');
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      Alert.alert('Error', 'Password must contain at least one uppercase letter');
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      Alert.alert('Error', 'Password must contain at least one number');
+      return;
+    }
+
+    if (!/[!@#$%^&*]/.test(password)) {
+      Alert.alert('Error', 'Password must contain at least one special character');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await securityService.register(fullName, email, password);
+      
+      if (result.success) {
+        // Store basic user info WITH PASSWORD for local authentication
+        await AsyncStorage.setItem(`user_${email}`, JSON.stringify({
+          fullName,
+          email,
+          password, // Store the password for local authentication
+          role: 'patient' // Default role
+        }));
+
+        Alert.alert(
+          'Registration Successful',
+          'Your account has been created. Please login to continue.',
+          [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+        );
+      } else {
+        Alert.alert('Registration Failed', result.message || 'Unable to create account');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      Alert.alert('Error', 'An unexpected error occurred during registration');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   return (
@@ -125,8 +194,16 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Create Account</Text>
+          <TouchableOpacity 
+            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]} 
+            onPress={handleRegister}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.registerButtonText}>Create Account</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
@@ -151,6 +228,21 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.loginLink}>Login</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>By registering, you agree to our </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('TermsAndConditions', {
+              terms: [
+                'Use the app only for its intended medical purposes',
+                'Keep your login credentials secure',
+                'Not share sensitive medical information through unsecured channels',
+                'Comply with all applicable laws and regulations',
+                'Accept our data privacy and protection policies'
+              ]
+            })}>
+              <Text style={styles.termsLink}>Terms and Conditions</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -277,6 +369,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  registerButtonDisabled: {
+    backgroundColor: '#A5D6A7',
+    opacity: 0.8,
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  termsText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  termsLink: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
-export default RegisterScreen; 
+export default RegisterScreen;

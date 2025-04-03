@@ -6,6 +6,9 @@ export type HealthData = {
   bloodPressureDiastolic: number;
   oxygenLevel: number;
   temperature: number;
+  weight: number;
+  type?: string;
+  data?: string;
 };
 
 export type HealthStatus = 'normal' | 'warning' | 'critical';
@@ -13,9 +16,9 @@ export type HealthStatus = 'normal' | 'warning' | 'critical';
 // Normal ranges for health metrics - Updated with more precise clinical thresholds
 const NORMAL_RANGES = {
   heartRate: { min: 60, max: 100 },
-  // Updated blood pressure categories based on medical guidelines
-  bloodPressureSystolic: { min: 90, max: 129 }, // Normal to elevated
-  bloodPressureDiastolic: { min: 60, max: 84 }, // Normal to elevated
+ 
+  bloodPressureSystolic: { min: 90, max: 129 }, 
+  bloodPressureDiastolic: { min: 60, max: 84 }, 
   oxygenLevel: { min: 95, max: 100 },
   temperature: { min: 36.1, max: 37.2 },
 };
@@ -29,7 +32,7 @@ const CRITICAL_THRESHOLDS = {
   temperature: { min: 35, max: 38.5 }, // Hypothermia or significant fever
 };
 
-// Enhanced sample training data with more varied cases
+
 const TRAINING_DATA = [
   // Normal data points [HR, BPS, BPD, O2, Temp]
   [70, 110, 70, 98, 36.6],
@@ -56,9 +59,9 @@ const TRAINING_DATA = [
 
 // Labels for training data: 0 = normal, 1 = warning, 2 = critical
 const TRAINING_LABELS = [
-  0, 0, 0, 0, 0,  // Normal
-  1, 1, 1, 1, 1,  // Warning
-  2, 2, 2, 2, 2, 2  // Critical
+  0, 0, 0, 0, 0,  
+  1, 1, 1, 1, 1,  
+  2, 2, 2, 2, 2, 2  
 ];
 
 class HealthAnalysisService {
@@ -92,10 +95,11 @@ class HealthAnalysisService {
   }
 
   /**
-   * Analyze health data using the SVM model
-   * @param data Health data to analyze
-   * @returns Status classification and detailed analysis
+
+   * @param data 
+   * @returns
    */
+
   public analyzeHealthData(data: HealthData): { 
     status: HealthStatus, 
     analysis: string,
@@ -129,7 +133,7 @@ class HealthAnalysisService {
       console.error('Error predicting with SVM:', error);
     }
 
-    // Determine final status - give priority to individual critical metrics
+    // Determine final status 
     let status: HealthStatus;
     if (hasCriticalMetrics) {
       status = 'critical';
