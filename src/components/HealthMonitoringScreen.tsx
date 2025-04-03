@@ -94,7 +94,7 @@ const HealthMonitoringScreen: React.FC = () => {
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
-    
+
     // Load unread alerts count
     setUnreadAlerts(healthMonitoringService.getUnreadAlertsCount());
   }, []);
@@ -114,10 +114,10 @@ const HealthMonitoringScreen: React.FC = () => {
       case 'blood pressure':
         const bpMatch = /^\d{2,3}\/\d{2,3}$/.test(value);
         if (!bpMatch) return false;
-        
+
         const [systolic, diastolic] = value.split('/').map(Number);
         if (systolic <= diastolic) return false;
-        
+
         setHealthData(prev => ({
           ...prev,
           bloodPressureSystolic: systolic,
@@ -184,7 +184,7 @@ const HealthMonitoringScreen: React.FC = () => {
       'weight': 'weight',
       'oxygen level': 'oxygenLevel'
     };
-    
+
     return metricMap[metric.toLowerCase()] || 'heartRate';
   };
 
@@ -203,7 +203,7 @@ const HealthMonitoringScreen: React.FC = () => {
   // Function to check for abnormalities in health metrics
   const checkForAbnormalities = (metric: HealthMetric): HealthStatus => {
     const value = parseFloat(metric.value);
-    
+
     switch (metric.type) {
       case 'bloodPressure':
         const [systolic, diastolic] = metric.value.split('/').map(Number);
@@ -338,7 +338,7 @@ const HealthMonitoringScreen: React.FC = () => {
             ],
             status: checkForAbnormalities(newMetric)
           };
-        
+
           updatePatient(currentPatient.id, updatedPatient);
 
           // Check for abnormalities and generate alerts
@@ -371,7 +371,7 @@ const HealthMonitoringScreen: React.FC = () => {
               patientName: currentPatient.name,
               message: alertMessage,
               time: new Date().toISOString(),
-              status, 
+              status,
               read: false
             });
 
@@ -560,10 +560,10 @@ const HealthMonitoringScreen: React.FC = () => {
       if (currentPatient && currentPatient.id) {
         // Save the result to the monitoring service with patient ID
         healthMonitoringService.saveHealthData(
-          healthData, 
+          healthData,
           result.status
         );
-        
+
         // Update unread alerts count
         setUnreadAlerts(healthMonitoringService.getUnreadAlertsCount());
       } else {
@@ -741,7 +741,7 @@ const HealthMonitoringScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -1004,7 +1004,182 @@ const HealthMonitoringScreen: React.FC = () => {
                   <Text style={styles.analysisDetailsText}>
                     {analysisResult.analysis}
                   </Text>
+
+                  {/* Detailed Metrics Analysis */}
+                  <View style={styles.metricsContainer}>
+                    <Text style={styles.metricsTitle}>Detailed Metrics Assessment</Text>
+
+                    {/* Heart Rate */}
+                    <View style={[ styles.metricDetail, analysisResult.metrics.heartRate?.status !== 'normal' &&
+(analysisResult.metrics.heartRate?.status === 'warning' ? styles.metricDetailWarning : analysisResult.metrics.heartRate?.status === 'critical' ? styles.metricDetailCritical : undefined)
+]}>
+                      <View style={styles.metricHeader}>
+                        <Ionicons name="heart" size={20} color={getStatusColor(analysisResult.metrics.heartRate?.status || 'normal')} />
+                        <Text style={styles.metricName}>HEART RATE</Text>
+                        <Text style={[styles.metricStatus, { color: getStatusColor(analysisResult.metrics.heartRate?.status || 'normal') }]}>
+                          {analysisResult.metrics.heartRate?.status.toUpperCase() || 'NORMAL'}
+                        </Text>
+                      </View>
+                      <Text style={styles.metricValue}>
+                        {analysisResult.metrics.heartRate?.value || healthData.heartRate} bpm
+                      </Text>
+                      <Text style={styles.metricAssessment}>
+                        {analysisResult.metrics.heartRate?.status === 'normal'
+                          ? 'Your heart rate is within the normal range.'
+                          : analysisResult.metrics.heartRate?.status === 'warning'
+                            ? 'Your heart rate is slightly outside the normal range.'
+                            : 'Your heart rate requires immediate attention.'}
+                      </Text>
+                      <Text style={styles.metricRecommendation}>
+                        {analysisResult.metrics.heartRate?.status === 'normal'
+                          ? 'Continue maintaining your healthy lifestyle.'
+                          : analysisResult.metrics.heartRate?.status === 'warning'
+                            ? 'Consider rest and hydration. Monitor for changes.'
+                            : 'Please consult a healthcare professional immediately.'}
+                      </Text>
+                    </View>
+
+                    {/* Blood Pressure */}
+                    <View style={[
+                      styles.metricDetail,
+                      (analysisResult.metrics.bloodPressureSystolic?.status !== 'normal' ||
+                        analysisResult.metrics.bloodPressureDiastolic?.status !== 'normal') &&
+                      (analysisResult.metrics.bloodPressureSystolic?.status === 'warning' ||
+                        analysisResult.metrics.bloodPressureDiastolic?.status === 'warning'
+                        ? styles.metricDetailWarning
+                        : styles.metricDetailCritical)
+                    ]}>
+                      <View style={styles.metricHeader}>
+                        <Ionicons name="fitness" size={20} color={getStatusColor(
+                          analysisResult.metrics.bloodPressureSystolic?.status !== 'normal' ?
+                            analysisResult.metrics.bloodPressureSystolic?.status :
+                            analysisResult.metrics.bloodPressureDiastolic?.status || 'normal')} />
+                        <Text style={styles.metricName}>BLOOD PRESSURE</Text>
+                        <Text style={[styles.metricStatus, {
+                          color: getStatusColor(
+                            analysisResult.metrics.bloodPressureSystolic?.status !== 'normal' ?
+                              analysisResult.metrics.bloodPressureSystolic?.status :
+                              analysisResult.metrics.bloodPressureDiastolic?.status || 'normal')
+                        }]}>
+                          {(analysisResult.metrics.bloodPressureSystolic?.status !== 'normal' ?
+                            analysisResult.metrics.bloodPressureSystolic?.status :
+                            analysisResult.metrics.bloodPressureDiastolic?.status || 'normal').toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.metricValue}>
+                        {analysisResult.metrics.bloodPressureSystolic?.value || healthData.bloodPressureSystolic}/
+                        {analysisResult.metrics.bloodPressureDiastolic?.value || healthData.bloodPressureDiastolic} mmHg
+                      </Text>
+                      <Text style={styles.metricAssessment}>
+                        {analysisResult.metrics.bloodPressureSystolic?.status === 'normal' &&
+                          analysisResult.metrics.bloodPressureDiastolic?.status === 'normal'
+                          ? 'Your blood pressure is within the normal range.'
+                          : (analysisResult.metrics.bloodPressureSystolic?.status === 'warning' ||
+                            analysisResult.metrics.bloodPressureDiastolic?.status === 'warning')
+                            ? 'Your blood pressure is slightly elevated or low.'
+                            : 'Your blood pressure requires immediate attention.'}
+                      </Text>
+                      <Text style={styles.metricRecommendation}>
+                        {analysisResult.metrics.bloodPressureSystolic?.status === 'normal' &&
+                          analysisResult.metrics.bloodPressureDiastolic?.status === 'normal'
+                          ? 'Continue with your current diet and exercise routine.'
+                          : (analysisResult.metrics.bloodPressureSystolic?.status === 'warning' ||
+                            analysisResult.metrics.bloodPressureDiastolic?.status === 'warning')
+                            ? 'Reduce sodium intake, manage stress, and monitor regularly.'
+                            : 'Seek immediate medical attention and follow prescribed medication.'}
+                      </Text>
+                    </View>
+
+                    {/* Temperature */}
+                    <View style={[ styles.metricDetail, analysisResult.metrics.temperature?.status !== 'normal' &&
+(analysisResult.metrics.temperature?.status === 'warning' ? styles.metricDetailWarning : analysisResult.metrics.temperature?.status === 'critical' ? styles.metricDetailCritical : undefined)
+]}>
+                      <View style={styles.metricHeader}>
+                        <Ionicons name="thermometer" size={20} color={getStatusColor(analysisResult.metrics.temperature?.status || 'normal')} />
+                        <Text style={styles.metricName}>TEMPERATURE</Text>
+                        <Text style={[styles.metricStatus, { color: getStatusColor(analysisResult.metrics.temperature?.status || 'normal') }]}>
+                          {analysisResult.metrics.temperature?.status.toUpperCase() || 'NORMAL'}
+                        </Text>
+                      </View>
+                      <Text style={styles.metricValue}>
+                        {analysisResult.metrics.temperature?.value || healthData.temperature} °C
+                      </Text>
+                      <Text style={styles.metricAssessment}>
+                        {analysisResult.metrics.temperature?.status === 'normal'
+                          ? 'Your body temperature is within the normal range.'
+                          : analysisResult.metrics.temperature?.status === 'warning'
+                            ? 'Your body temperature is slightly elevated or low.'
+                            : 'Your body temperature indicates a fever or hypothermia.'}
+                      </Text>
+                      <Text style={styles.metricRecommendation}>
+                        {analysisResult.metrics.temperature?.status === 'normal'
+                          ? 'Continue monitoring as part of your routine health checks.'
+                          : analysisResult.metrics.temperature?.status === 'warning'
+                            ? 'Rest, stay hydrated, and monitor for changes.'
+                            : 'Take fever-reducing medication if elevated, or warm up if low. Seek medical help if persistent.'}
+                      </Text>
+                    </View>
+
+                    {/* Oxygen Level */}
+                    <View style={[
+  styles.metricDetail,
+  analysisResult.metrics.oxygenLevel?.status !== 'normal' && 
+  (analysisResult.metrics.oxygenLevel?.status === 'warning' 
+    ? styles.metricDetailWarning 
+    : analysisResult.metrics.oxygenLevel?.status === 'critical' 
+      ? styles.metricDetailCritical 
+      : undefined)
+]}>
+  <View style={styles.metricHeader}>
+    <Ionicons name="water" size={20} color={getStatusColor(analysisResult.metrics.oxygenLevel?.status || 'normal')} />
+    <Text style={styles.metricName}>OXYGEN LEVEL</Text>
+    <Text style={[styles.metricStatus, { color: getStatusColor(analysisResult.metrics.oxygenLevel?.status || 'normal') }]}>
+      {analysisResult.metrics.oxygenLevel?.status.toUpperCase() || 'NORMAL'}
+    </Text>
+  </View>
+  <Text style={styles.metricValue}>
+    {analysisResult.metrics.oxygenLevel?.value || healthData.oxygenLevel} %
+  </Text>
+  <Text style={styles.metricAssessment}>
+    {analysisResult.metrics.oxygenLevel?.status === 'normal'
+      ? 'Your oxygen saturation level is within the normal range.'
+      : analysisResult.metrics.oxygenLevel?.status === 'warning'
+        ? 'Your oxygen level is slightly below normal.'
+        : 'Your oxygen level is critically low.'}
+  </Text>
+  <Text style={styles.metricRecommendation}>
+    {analysisResult.metrics.oxygenLevel?.status === 'normal'
+      ? 'Continue with normal activities and breathing exercises.'
+      : analysisResult.metrics.oxygenLevel?.status === 'warning'
+        ? 'Practice deep breathing exercises and ensure good ventilation.'
+        : 'Seek immediate medical attention. Supplemental oxygen may be required.'}
+  </Text>
+</View>
+
+
+                    {/* Weight (if available) */}
+                    {analysisResult.metrics.weight && (
+                      <View style={styles.metricDetail}>
+                        <View style={styles.metricHeader}>
+                          <Ionicons name="body" size={20} color="#4A4A4A" />
+                          <Text style={styles.metricName}>WEIGHT</Text>
+                          <Text style={styles.metricStatus}>INFORMATIONAL</Text>
+                        </View>
+                        <Text style={styles.metricValue}>
+                          {analysisResult.metrics.weight.value || healthData.weight} kg
+                        </Text>
+                        <Text style={styles.metricAssessment}>
+                          Weight tracking helps monitor overall health trends.
+                        </Text>
+                        <Text style={styles.metricRecommendation}>
+                          Maintain a balanced diet and regular exercise routine.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
                   <View style={styles.analysisChart}>
+                    <Text style={styles.chartTitle}>Health Metrics Visualization</Text>
                     <LineChart
                       data={{
                         labels: ['Heart Rate', 'BP Sys', 'BP Dia', 'Temp', 'O2'],
@@ -1082,6 +1257,73 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+
+  metricDetail: {
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  metricDetailWarning: {
+    backgroundColor: '#FFF8E1',
+    borderLeftColor: '#FFC107',
+  },
+  metricDetailCritical: {
+    backgroundColor: '#FFEBEE',
+    borderLeftColor: '#FF5252',
+  },
+  metricHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  metricName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  metricStatus: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  metricAssessment: {
+    fontSize: 14,
+    color: '#333333',
+    marginBottom: 4,
+  },
+  metricRecommendation: {
+    fontSize: 14,
+    color: '#666666',
+    fontStyle: 'italic',
+  },
+  metricsContainer: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  metricsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   headerLeft: {
     flex: 1,
@@ -1358,4 +1600,3 @@ const styles = StyleSheet.create({
 });
 
 export default HealthMonitoringScreen;
-              

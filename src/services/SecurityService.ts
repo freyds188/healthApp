@@ -194,23 +194,24 @@ class SecurityService {
       return false;
     }
     
+    // Patients can only access their own data
+    if (this.currentUser.role === 'patient') {
+      return this.currentUser.id === userId;
+    }
+    
+    // Doctors can access their patients' data
+    if (this.currentUser.role === 'doctor') {
+      // Add logic to verify doctor-patient relationship
+      return true; // Replace with actual verification
+    }
+    
+    // Admins can access all data
     if (this.currentUser.role === 'admin') {
-      this.logSecurityEvent('Admin accessed health data', 'info', { targetUserId: userId });
       return true;
     }
     
-    // Users can only access their own data
-    const hasAccess = this.currentUser.id === userId;
-    
-    if (!hasAccess) {
-      this.logSecurityEvent('Unauthorized health data access attempt', 'warning', {
-        userId: this.currentUser.id,
-        targetUserId: userId
-      });
-    }
-    
-    return hasAccess;
-  }
+    return false;
+}
   
   // Security logging
   

@@ -361,4 +361,4 @@ class HealthMonitoringService {
 }
 
 // Export a singleton instance of the health monitoring service
-export const healthMonitoringService = new HealthMonitoringService(); 
+export const healthMonitoringService = new HealthMonitoringService();
